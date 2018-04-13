@@ -74,40 +74,58 @@ bool* getOptions(int num_args, char* args[], bool* options) {
   if(num_args > 2) {
     int c=1;
     while(c < num_args-2) {
-      printf("%s\n", args[c]);
-      if(strcmp(args[c], "-i") == 0) {options[OPTION_i] = true; printf("-i true\n");}
-      else if(strcmp(args[c], "-l") == 0) {options[OPTION_l] = true; printf("-l true\n");}
-      else if(strcmp(args[c], "-n") == 0) {options[OPTION_n] = true; printf("-n true\n");}
-      else if(strcmp(args[c], "-c") == 0) {options[OPTION_c] = true; printf("-c true\n");}
-      else if(strcmp(args[c], "-w") == 0) {options[OPTION_w] = true; printf("-w true\n");}
-      else if(strcmp(args[c], "-r") == 0) {options[OPTION_r] = true; printf("-r true\n");}
+      if(strcmp(args[c], "-i") == 0) options[OPTION_i] = true;
+      else if(strcmp(args[c], "-l") == 0) options[OPTION_l] = true;
+      else if(strcmp(args[c], "-n") == 0) options[OPTION_n] = true;
+      else if(strcmp(args[c], "-c") == 0) options[OPTION_c] = true;
+      else if(strcmp(args[c], "-w") == 0) options[OPTION_w] = true;
+      else if(strcmp(args[c], "-r") == 0) options[OPTION_r] = true;
       c++;
     }
   }
 
+  /*  for debugging
   printf(options[OPTION_i] ? "option_i = true\n" : "option_i = false\n");
   printf(options[OPTION_l] ? "option_l = true\n" : "option_l = false\n");
   printf(options[OPTION_n] ? "option_n = true\n" : "option_n = false\n");
   printf(options[OPTION_c] ? "option_c = true\n" : "option_c = false\n");
   printf(options[OPTION_w] ? "option_w = true\n" : "option_w = false\n");
   printf(options[OPTION_r] ? "option_r = true\n" : "option_r = false\n\n");
+  */
 
   return;
 }
 
 // finds pattern according to options
 char* findOptions(char* line, char* pattern, bool* options) {
-  if(options[OPTION_i] && options[OPTION_w]) return;
+  if(options[OPTION_i]) {
+    char* tmpline[strlen(line)];
+    strcpy(tmpline, line);
 
-  if(options[OPTION_i]) return strstr(strupr(line), strupr(pattern));
+    char* tmp = strstr(strupr(tmpline), strupr(pattern));
 
-  if(options[OPTION_w]) return;
+    if(tmp == NULL) return NULL;
 
-  return strstr(line, pattern);
+    if(options[OPTION_w]) {
+      if(strlen(tmp)-1 != strlen(pattern)) return NULL;
+    }
+
+    return tmp;
+  }
+
+  char* tmp = strstr(line, pattern);
+  if(tmp == NULL) return NULL;
+
+  if(options[OPTION_w]) {
+    if(strlen(tmp)-1 != strlen(pattern)) return NULL;
+  }
+
+  return tmp;
 }
 
 // decides what to print according to options
 void printOptions(char* path, char* line, int num_line, bool* options) {
+  // skips if option_c is true. Only prints afterwards
   if(options[OPTION_c]) return;
 
   else if(options[OPTION_l]) printf("Found in file %s\n\n", path);
@@ -122,8 +140,10 @@ void checkFile(char* path, int num_args, char* args[], bool* options) {
   char * line = NULL;
   size_t lenght = 0;
   ssize_t read;
-  char* pattern = NULL;
+  char* pattern = malloc(100);
   bool l_complete = false;
+  int c_counter = 0;
+  int line_num = 1;
 
   fp = fopen(path, "r");
 
@@ -131,24 +151,27 @@ void checkFile(char* path, int num_args, char* args[], bool* options) {
     return;
   }
 
-  pattern = args[num_args-2];
+  strcpy(pattern, args[num_args-2]);
 
-  printf("Checking file %s for %s\n\n", path, pattern);
+  printf("----------\nChecking file %s for %s\n\n", path, pattern);
 
-  int line_num = 1;
   while ((read = getline(&line, &lenght, fp)) != -1) {
-    if(findOptions(&line, pattern, options) != NULL){
-      l_complete = true;
-      printOptions(path, line_num, line, options);
+    if(findOptions(line, pattern, options) != NULL){
+      if(options[OPTION_c]) c_counter++;
+
+      if(options[OPTION_l]) l_complete = true;
+
+      printOptions(path, line, line_num, options);
     }
     line_num++;
+
     // with option_l it only needs to find the pattern once in the file
-    if(l_complete) break;
+    if(options[OPTION_l] && l_complete) break;
   }
 
-  if(options[OPTION_c]) printf("%s: found in %d lines\n", path, line_num);
+  if(options[OPTION_c]) printf("%s: found in %d lines\n\n", path, c_counter);
 
-  printf("Done checking file %s for %s\n\n", path, pattern);
+  printf("Done checking file %s for %s\n----------\n", path, pattern);
 
   fclose(fp);
 }
