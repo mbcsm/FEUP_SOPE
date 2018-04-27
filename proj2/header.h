@@ -3,7 +3,7 @@
 
 // constants
 #define WIDTH_PID 5
-#define FIFO_LEN 8
+#define FIFO_LEN 15
 #define MAX_CLI_SEATS 5
 
 #define DELAY()
