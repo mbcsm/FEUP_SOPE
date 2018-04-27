@@ -1,8 +1,11 @@
 #ifndef HEADER_H
 #define HEADER_H
 
-// variables
+// constants
 #define WIDTH_PID 5
 #define FIFO_LEN 8
+#define MAX_CLI_SEATS 5
+
+#define DELAY()
 
 #endif
