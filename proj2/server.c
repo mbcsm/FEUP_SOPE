@@ -13,7 +13,7 @@
 
 int receiveClientRequests(){
 	int fd, nread;
-  const char *fifo_name = "/tmp/requests";
+  const char *fifo_name = "/requests";
   char buf[256] ;
   fd = open(fifo_name, O_RDONLY);
   
@@ -21,7 +21,8 @@ int receiveClientRequests(){
 	while(1) {
     memset(buf, 0, 256);
     nread = read(fd, buf, 256);
-    printf("%d - %s\n", iteration);
+    printf("%d - %s\n", iteration, buf);
+    iteration++;
     sleep(1);
 	}
 }
