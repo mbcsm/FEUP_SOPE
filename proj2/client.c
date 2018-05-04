@@ -16,12 +16,15 @@ int main(int argc, char* argv[]) {
     exit(1);
   }
 
+  char pid[WIDTH_PID];
+  sprintf(pid, "%d", getpid());
+
   // Read args
   int timeout = atoi(argv[1]);
   int num_wanted_seats = atoi(argv[2]);
   char* pref_seat_list = argv[3];
   char* tmp_seat_list = pref_seat_list;
-  int seat_arr[num_wanted_seats];
+  int seat_arr[10];
   int c, bytesread, seat_arr_c = 0;
 
   // debugging
@@ -31,44 +34,45 @@ int main(int argc, char* argv[]) {
   while(sscanf(tmp_seat_list, "%d%n", &c, &bytesread) > 0) {
     seat_arr[seat_arr_c++] = c;
     tmp_seat_list += bytesread;
-    if(seat_arr_c >= num_wanted_seats) break;
   }
 
   // debugging
+  int num_seats = seat_arr_c;
   seat_arr_c = 0;
-  while(seat_arr_c < num_wanted_seats) {
-    printf("SEAT_ARR: %d\n", seat_arr[seat_arr_c]);
+  while(seat_arr_c < num_seats) {
+    printf("SEATS_WANTED: %d\n", seat_arr[seat_arr_c]);
     seat_arr_c++;
   }
 
-  // Create FIFOs
-  char pid[WIDTH_PID];
-  sprintf(pid, "%d", getpid());
-  char fifo_name[FIFO_LEN+1];
-  strcpy(fifo_name, "/fifos/");
-  strncat(fifo_name, "ans", 3);
-  strncat(fifo_name, pid, 5);
-
-  // debugging
-  printf("FIFO: %s\n", fifo_name);
-
-  int ans;
-  mkfifo(fifo_name, 0660);
-  printf("FIFO %s made\n", fifo_name);
-  if((ans = open(fifo_name, O_RDONLY)) == -1) printf("FIFO failed to open\n");
-  else printf("FIFO %d opened\n", ans);
-  /*
+  // Write to main FIFO
   int req;
   do {
+    printf("Trying to open the main FIFO\n");
     req = open("requests", O_WRONLY);
-    if(req==-1) sleep(1);
+    if(req==-1) sleep(3);
   } while(req == -1);
-  */
+
+  printf("Opened main FIFO... sending request now\n");
 
   // Send request
   char msg[100];
   sprintf(msg, "PID: %s NumSeats: %d Seats: %s", pid, num_wanted_seats, pref_seat_list);
   printf("MESSAGE - "); printf(msg); printf("\n");
+
+  // Create the FIFO that gets the answer from the server
+  char fifo_name[FIFO_LEN+1];
+  strcpy(fifo_name, "ans");
+  strcat(fifo_name, pid);
+  int ans;
+  int fno = mkfifo(fifo_name, 0660);
+  if(fno != 0) perror("ansFIFO");
+
+  char str[100];
+  printf("Waiting for answer from the server in FIFO %s\n", fifo_name);
+  ans = open(fifo_name, O_RDONLY);
+  //putchar('\n');
+  //while(readline(ans,str)) printf("%s",str);
+  //close(ans);
 
   exit(0);
 }
