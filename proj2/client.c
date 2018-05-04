@@ -13,8 +13,22 @@
 int ansfifo;
 char fifo_name[FIFO_LEN+1];
 
+int readline(int fd, char *str) {
+  int n;
+  do {
+    n = read(fd,str,1);
+  } while(n>0 && *str++ != '\0');
+
+  return (n>0);
+}
+
+void alarm_handler() {
+  printf("Client timed out..\n");
+  exit(3);
+}
+
 void closeFIFO() {
-  printf(" ... cleaning up FIFOs ...\n");
+  printf(".. cleaning up files ..\n");
   close(ansfifo);
   remove(fifo_name);
   exit(2);
@@ -27,6 +41,7 @@ int main(int argc, char* argv[]) {
   }
 
   int ansfifo;
+  atexit(closeFIFO);
   signal(SIGINT, closeFIFO);
 
   char pid[WIDTH_PID];
@@ -60,31 +75,38 @@ int main(int argc, char* argv[]) {
   // Write to main FIFO
   int req;
   do {
-    printf("Trying to open the main FIFO\n");
+    printf("\nTrying to open the main FIFO\n");
     req = open("requests", O_WRONLY);
     if(req==-1) sleep(3);
   } while(req == -1);
 
-  printf("Opened main FIFO... sending request now\n");
+  printf("Opened main FIFO.. sending request now\n");
 
   // Send request
   char msg[100];
   sprintf(msg, "PID: %s NumSeats: %d Seats: %s", pid, num_wanted_seats, pref_seat_list);
-  printf("MESSAGE - "); printf(msg); printf("\n");
+  printf("Request is '"); printf(msg); printf("'\n");
 
   // Create the FIFO that gets the answer from the server
   strcpy(fifo_name, "ans");
   strcat(fifo_name, pid);
   int ans;
   ansfifo = mkfifo(fifo_name, 0660);
-  if(ansfifo != 0) perror("ansFIFO");
+  if(ansfifo != 0)
+    perror("ansFIFO");
+
+  printf("Waiting for answer from the server in FIFO %s..\n", fifo_name);
+  signal(SIGALRM, alarm_handler);
+  alarm(timeout);
+
+  ans = open(fifo_name, O_RDONLY);
 
   char str[100];
-  printf("Waiting for answer from the server in FIFO %s\n", fifo_name);
-  ans = open(fifo_name, O_RDONLY);
-  //putchar('\n');
-  //while(readline(ans,str)) printf("%s",str);
-  //close(ans);
+  putchar('\n');
+  while(readline(ans,str))
+    printf("%s",str);
+
+  // write to clog.txt
 
   exit(0);
 }
