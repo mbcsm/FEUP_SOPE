@@ -102,24 +102,17 @@ int main(int argc, char* argv[]) {
   // write to clog.txt
   char answer[100];
   readline(ansfifo, answer);
-  decypherAnswer(answer);
+  answer_handler(answer);
 
   exit(0);
 }
 
-/* se invalido, a resposta recebida é um int
-* -1: qnt de lugares pedidos é maior que o MAX_CLI_SEATS
-* -2: numero de identificadores dos lugares pretendidos nao é valido
-* -3: os identificadores dos lugares pretendidos nao sao validos
-* -4: outros erros
-* -5: pelos menos um dos lugares nao esta disponivel
-* -6: sala cheia
-*
+/*
 * se valido, a resposta é
 * NUM_LUGARES_RESERVADOS RESERVA1 RESERVA2 RESERVA3 etc
 * ex: 3 12 13 14
 */
-void decypheranswer(char* answer) {
+void answer_handler(char* answer) {
   int bytesread, d, counter = 0;
   int answer_arr[20];
   char* tmp_answer = answer;
@@ -136,5 +129,22 @@ void decypheranswer(char* answer) {
     printf("ANSWER: %d\n", answer_arr[counter]);
     counter++;
   }
+
+  if(answer_arr[0] < 0)
+    invAnswer_handler(answer_arr[0]);
+
+
+
+}
+
+/* se invalido, a resposta recebida é um int
+* -1: qnt de lugares pedidos é maior que o MAX_CLI_SEATS
+* -2: numero de identificadores dos lugares pretendidos nao é valido
+* -3: os identificadores dos lugares pretendidos nao sao validos
+* -4: outros erros
+* -5: pelos menos um dos lugares nao esta disponivel
+* -6: sala cheia
+*/
+void invAnswer_handler(int err) {
 
 }
