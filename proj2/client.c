@@ -90,7 +90,6 @@ int main(int argc, char* argv[]) {
   // Create the FIFO that gets the answer from the server
   strcpy(fifo_name, "ans");
   strcat(fifo_name, pid);
-  int ans;
   ansfifo = mkfifo(fifo_name, 0660);
   if(ansfifo != 0)
     perror("ansFIFO");
@@ -98,15 +97,44 @@ int main(int argc, char* argv[]) {
   printf("Waiting for answer from the server in FIFO %s..\n", fifo_name);
   signal(SIGALRM, alarm_handler);
   alarm(timeout);
-
-  ans = open(fifo_name, O_RDONLY);
-
-  char str[100];
-  putchar('\n');
-  while(readline(ans,str))
-    printf("%s",str);
+  ansfifo = open(fifo_name, O_RDONLY);
 
   // write to clog.txt
+  char answer[100];
+  readline(ansfifo, answer);
+  decypherAnswer(answer);
 
   exit(0);
+}
+
+/* se invalido, a resposta recebida é um int
+* -1: qnt de lugares pedidos é maior que o MAX_CLI_SEATS
+* -2: numero de identificadores dos lugares pretendidos nao é valido
+* -3: os identificadores dos lugares pretendidos nao sao validos
+* -4: outros erros
+* -5: pelos menos um dos lugares nao esta disponivel
+* -6: sala cheia
+*
+* se valido, a resposta é
+* NUM_LUGARES_RESERVADOS RESERVA1 RESERVA2 RESERVA3 etc
+* ex: 3 12 13 14
+*/
+void decypheranswer(char* answer) {
+  int bytesread, d, counter = 0;
+  int answer_arr[20];
+  char* tmp_answer = answer;
+
+  while(sscanf(tmp_answer, "%d%n", &d, &bytesread) > 0) {
+    answer_arr[counter++] = d;
+    tmp_answer += bytesread;
+  }
+
+  // debugging
+  int num_ints = counter;
+  counter = 0;
+  while(counter < num_ints) {
+    printf("ANSWER: %d\n", answer_arr[counter]);
+    counter++;
+  }
+
 }
