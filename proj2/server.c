@@ -12,59 +12,78 @@
 #include "header.h"
 #include <semaphore.h>
 	
-	
-volatile int* array[10000];
-pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
   
 int num_room_seats,
 		num_ticket_offices,
-		open_time;
-	
-	
+		open_time,
+		total_requests = 0,
+		total_requests_responded = 0;
+
 struct Seats {
+  int taken;
   int seat;
-  int mtx;
-} seat;
+  pthread_mutex_t mtx;
+} seat[1000];
 
 struct Requests {
   char requestInfo[256] ;
-} request;
+} request[1000];
 
 
-void *createThreadForTicketBooth(void *pointer){
+void *createThreadForTicketBooth(void *arg){
+	printf("L.\n");
   unsigned long i = 0;
-  pthread_t id = pthread_self();
+  pthread_t threadId = pthread_self();
+
   
-  pthread_mutex_lock(&mtx);
+  while(true){
+		printf("Locking and waiting. Type unlock to unlock me.\n");
+		pthread_mutex_lock(&lock);
+		pthread_cond_wait(&cv, &lock);
+		printf("I've been unlocked - %d.\n", threadId);
+		pthread_mutex_unlock(&lock);
+		sleep(1);
+  }
+	
   
-	pthread_mutex_unlock(&mtx);
 
   return NULL;
 }
 
-
 void * receiveClientRequests(void * arg) {
-	
-  struct Seats seat[num_room_seats];
-  struct Requests request;
-  
   //opening booths threads
 	pthread_t tid[num_ticket_offices];
 	
 	printf("\n Openning [%d] Booths\n", num_ticket_offices);
 	for(int i = 0; i < num_ticket_offices; i++){
-		  int i = 0;
 			int err;
 			err = pthread_create(&(tid[i]), NULL, createThreadForTicketBooth, NULL);
 			if (err != 0){
 				printf("\ncan't create thread :[%s]", strerror(err));
-				return -1;
+				return NULL;
 			}
 			else{
 				printf("\n Booth Openned successfully\n");
-    		pthread_join(tid[i], NULL); 
 			}
 	}
+	
+	
+	
+	//test manual unlock of booths, for testing purposes only!!!!!
+  char cmd[1024];
+	printf("Type lock to run a thread that locks and waits.\n");
+	printf("Type unlock to unlock the same thread.\n");
+	while(fscanf(stdin, "%s", cmd) != EOF) {
+		if(strcmp(cmd, "lock") == 0) { 
+		} else if(strcmp(cmd, "unlock") == 0) {
+			pthread_cond_signal(&cv);
+		}
+
+	}	 
+	
 	
 	
 	//reading from FIFO
@@ -80,15 +99,24 @@ void * receiveClientRequests(void * arg) {
     
     if(read(fd, buf, 256)>0){
    		printf("%d - %s\n", iteration, buf);
+   		total_requests++;
    		
     }
 		
     iteration++;
     sleep(1);
 	}
+	*/
 }
 
+int initializeSeats(){
+	for(int i = 0; i< num_room_seats; i++){
+		seat[i].taken = 0;
+		seat[i].seat = i;
+		seat[i].mtx = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;;
+	}
 
+}
 int main(int argc, char* argv[]) {
   if(argc != 4){
     printf("ERROR: wrong number of arguments\n Try [options] <pattern> <filepath>\n");
@@ -99,6 +127,8 @@ int main(int argc, char* argv[]) {
 	num_ticket_offices = atoi(argv[2]);
 	open_time = atoi(argv[3]);
 	
+	
+	initializeSeats();
 	
 	
 	printf("\n Openning Store\n");
@@ -114,7 +144,5 @@ int main(int argc, char* argv[]) {
 		pthread_join(mainThreadId, NULL); 
 	}   
 	  
-
-	
   return 0;
 }
