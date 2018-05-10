@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <time.h>
 #include "header.h"
 #include <semaphore.h>
 	
@@ -22,29 +23,84 @@ int num_room_seats,
 		total_requests = 0,
 		total_requests_responded = 0;
 
-struct Seats {
+struct Seat {
+	int clientId; 
   int taken;
   int seat;
   pthread_mutex_t mtx;
 } seat[1000];
 
-struct Requests {
-  char requestInfo[256] ;
+struct Request {
+	int seatsWanted[MAX_CLI_SEATS];
+	int numSeatsWanted;
 } request[1000];
 
 
+int * isSeatFree(int seatNum) {
+		if(seat[seatNum].taken == 1){
+			return 1;
+		}
+	return 0;
+}
+
+void bookSeat(int seatNum, int clientId){
+	seat[seatNum].clientId = clientId;
+	seat[seatNum].taken = 1;
+}
+
+void freeSeat(int seatNum){
+	seat[seatNum].taken = 0;
+
+}
+
 void *createThreadForTicketBooth(void *arg){
-	printf("L.\n");
   unsigned long i = 0;
   pthread_t threadId = pthread_self();
 
   
   while(true){
-		printf("Locking and waiting. Type unlock to unlock me.\n");
 		pthread_mutex_lock(&lock);
 		pthread_cond_wait(&cv, &lock);
-		printf("I've been unlocked - %d.\n", threadId);
+		int requestToCheck = total_requests_responded;
+		total_requests_responded++;
 		pthread_mutex_unlock(&lock);
+		
+		printf("%d - %d - ", threadId, request[requestToCheck].numSeatsWanted);		
+		for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
+			printf("%d ", request[requestToCheck].seatsWanted[i]);		
+		}	
+		
+		int seatNotFree = 0;
+		for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
+			if(seatNotFree == 1)
+				continue;
+			pthread_mutex_lock(&seat[request[requestToCheck].seatsWanted[i]].mtx);
+			if(isSeatFree(request[requestToCheck].seatsWanted[i])==0)
+				bookSeat(request[requestToCheck].seatsWanted[i], requestToCheck);
+			else
+				seatNotFree = 1;
+			pthread_mutex_unlock(&seat[request[requestToCheck].seatsWanted[i]].mtx);
+			
+			if(seatNotFree == 1){
+				for(int j = 0; j < i; j++ ){
+					pthread_mutex_lock(&seat[request[requestToCheck].seatsWanted[j]].mtx);
+					freeSeat(request[requestToCheck].seatsWanted[j]);
+					pthread_mutex_unlock(&seat[request[requestToCheck].seatsWanted[j]].mtx);
+					i = 999;
+				}
+				printf(" - NAV \n");	
+				//Send Message To Client Saying the Seats are already taken
+			}
+		}
+		if(seatNotFree == 0){
+			printf(" - ");		
+			for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
+				printf("%d ", request[requestToCheck].seatsWanted[i]);		
+			}	
+			printf("\n");		
+		}
+		
+		
 		sleep(1);
   }
 	
@@ -74,12 +130,23 @@ void * receiveClientRequests(void * arg) {
 	
 	//test manual unlock of booths, for testing purposes only!!!!!
   char cmd[1024];
-	printf("Type lock to run a thread that locks and waits.\n");
-	printf("Type unlock to unlock the same thread.\n");
+	printf("Creating Requests.....\n");
+
+	srand(time(NULL));
+	for(int i = 0; i < 100; i ++){
+		total_requests++;
+		request[i].numSeatsWanted = rand() % MAX_CLI_SEATS + 1;
+		for(int j = 0; j < request[i].numSeatsWanted; j ++){
+			request[i].seatsWanted[j] = rand() % (999 + 1 - 0) + 0;
+		}		
+		
+	}
+	
+	printf("Press 'send' to send a request (repeat if you want to send more)\n");
 	while(fscanf(stdin, "%s", cmd) != EOF) {
-		if(strcmp(cmd, "lock") == 0) { 
-		} else if(strcmp(cmd, "unlock") == 0) {
+		if(strcmp(cmd, "send") == 0) {
 			pthread_cond_signal(&cv);
+			sleep(1);
 		}
 
 	}	 
@@ -99,14 +166,12 @@ void * receiveClientRequests(void * arg) {
     
     if(read(fd, buf, 256)>0){
    		printf("%d - %s\n", iteration, buf);
-   		total_requests++;
-   		
+   		//TODO:Get request information from fifo here   		
     }
 		
     iteration++;
     sleep(1);
 	}
-	*/
 }
 
 int initializeSeats(){
