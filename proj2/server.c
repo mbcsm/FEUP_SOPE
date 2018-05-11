@@ -167,7 +167,7 @@ void * receiveClientRequests(void * arg) {
 
 	//reading from FIFO
 	int nread;
-  char buf[256];
+	char buf[256];
 	req = mkfifo(fifo_name, 0660);
 	if(req != 0)
 		perror("\n Request FIFO make");
@@ -177,16 +177,25 @@ void * receiveClientRequests(void * arg) {
 
   int iteration = 0;
 	while(1) {
-		printf("\n Waiting for requests..\n");
-//    memset(buf, 0, 256);
+
+		memset(buf, 0, 256);
 
     if(readline(req, buf)) {
-			// send request to a channel
+			char request_pid[10], request_numseats[10], request_seats[100];
 
-			// debugging
-			printf("Request received: %s\n", buf);
+			if(!(sscanf(buf, "PID: %s NumSeats: %s Seats: %s", request_pid, request_numseats, request_seats))) {
+				printf("\n Invalid request\n");
+			}
+			else {
+				printf("\n Request received: %s\n", buf);
+
+				// send request to a channel
+
+			}
 		}
+
     iteration++;
+		printf("\n Waiting for requests..\n");
     sleep(3);
 	}
 }
@@ -197,7 +206,7 @@ int readline(int fd, char *str) {
     n = read(fd,str,1);
   } while(n>0 && *str++ != '\0');
 
-  return (n>0);
+  return (n>0 && strlen(str)==0);
 }
 
 int initializeSeats(){
