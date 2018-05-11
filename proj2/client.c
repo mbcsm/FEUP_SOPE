@@ -86,6 +86,7 @@ int main(int argc, char* argv[]) {
   char msg[100];
   sprintf(msg, "PID: %s NumSeats: %d Seats: %s", pid, num_wanted_seats, pref_seat_list);
   printf("Request is '"); printf(msg); printf("'\n");
+  write(req, msg, sizeof(msg));
 
   // Create the FIFO that gets the answer from the server
   strcpy(fifo_name, "ans");
@@ -98,9 +99,10 @@ int main(int argc, char* argv[]) {
   signal(SIGALRM, alarm_handler);
   alarm(timeout);
   ansfifo = open(fifo_name, O_RDONLY);
+  perror("ansfifo open");
 
   // write to clog.txt
-  char answer[100];
+  char answer[256];
   readline(ansfifo, answer);
   answer_handler(answer);
 

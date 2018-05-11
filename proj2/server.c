@@ -12,19 +12,22 @@
 #include <time.h>
 #include "header.h"
 #include <semaphore.h>
-	
+
 
 pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-  
-int num_room_seats,
+
+int req,
+		num_room_seats,
 		num_ticket_offices,
 		open_time,
 		total_requests = 0,
 		total_requests_responded = 0;
 
+const char *fifo_name = "requests";
+
 struct Seat {
-	int clientId; 
+	int clientId;
   int taken;
   int seat;
   pthread_mutex_t mtx;
@@ -35,6 +38,12 @@ struct Request {
 	int numSeatsWanted;
 } request[1000];
 
+void closeFIFO() {
+  printf(".. cleaning up files ..\n");
+	close(req);
+  remove(fifo_name);
+  exit(2);
+}
 
 int * isSeatFree(int seatNum) {
 		if(seat[seatNum].taken == 1){
@@ -57,19 +66,19 @@ void *createThreadForTicketBooth(void *arg){
   unsigned long i = 0;
   pthread_t threadId = pthread_self();
 
-  
+
   while(true){
 		pthread_mutex_lock(&lock);
 		pthread_cond_wait(&cv, &lock);
 		int requestToCheck = total_requests_responded;
 		total_requests_responded++;
 		pthread_mutex_unlock(&lock);
-		
-		printf("%d - %d - ", threadId, request[requestToCheck].numSeatsWanted);		
+
+		printf("%d - %d - ", threadId, request[requestToCheck].numSeatsWanted);
 		for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
-			printf("%d ", request[requestToCheck].seatsWanted[i]);		
-		}	
-		
+			printf("%d ", request[requestToCheck].seatsWanted[i]);
+		}
+
 		int seatNotFree = 0;
 		for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
 			if(seatNotFree == 1)
@@ -80,7 +89,7 @@ void *createThreadForTicketBooth(void *arg){
 			else
 				seatNotFree = 1;
 			pthread_mutex_unlock(&seat[request[requestToCheck].seatsWanted[i]].mtx);
-			
+
 			if(seatNotFree == 1){
 				for(int j = 0; j < i; j++ ){
 					pthread_mutex_lock(&seat[request[requestToCheck].seatsWanted[j]].mtx);
@@ -88,23 +97,23 @@ void *createThreadForTicketBooth(void *arg){
 					pthread_mutex_unlock(&seat[request[requestToCheck].seatsWanted[j]].mtx);
 					i = 999;
 				}
-				printf(" - NAV \n");	
+				printf(" - NAV \n");
 				//Send Message To Client Saying the Seats are already taken
 			}
 		}
 		if(seatNotFree == 0){
-			printf(" - ");		
+			printf(" - ");
 			for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
-				printf("%d ", request[requestToCheck].seatsWanted[i]);		
-			}	
-			printf("\n");		
+				printf("%d ", request[requestToCheck].seatsWanted[i]);
+			}
+			printf("\n");
 		}
-		
-		
+
+
 		sleep(1);
   }
-	
-  
+
+
 
   return NULL;
 }
@@ -112,7 +121,7 @@ void *createThreadForTicketBooth(void *arg){
 void * receiveClientRequests(void * arg) {
   //opening booths threads
 	pthread_t tid[num_ticket_offices];
-	
+
 	printf("\n Openning [%d] Booths\n", num_ticket_offices);
 	for(int i = 0; i < num_ticket_offices; i++){
 			int err;
@@ -125,10 +134,11 @@ void * receiveClientRequests(void * arg) {
 				printf("\n Booth Openned successfully\n");
 			}
 	}
-	
-	
-	
+
+
+
 	//test manual unlock of booths, for testing purposes only!!!!!
+	/*
   char cmd[1024];
 	printf("Creating Requests.....\n");
 
@@ -138,10 +148,12 @@ void * receiveClientRequests(void * arg) {
 		request[i].numSeatsWanted = rand() % MAX_CLI_SEATS + 1;
 		for(int j = 0; j < request[i].numSeatsWanted; j ++){
 			request[i].seatsWanted[j] = rand() % (999 + 1 - 0) + 0;
-		}		
-		
+		}
 	}
-	
+	*/
+
+
+	/*
 	printf("Press 'send' to send a request (repeat if you want to send more)\n");
 	while(fscanf(stdin, "%s", cmd) != EOF) {
 		if(strcmp(cmd, "send") == 0) {
@@ -149,29 +161,43 @@ void * receiveClientRequests(void * arg) {
 			sleep(1);
 		}
 
-	}	 
-	
-	
-	
+	}
+	*/
+
+
 	//reading from FIFO
-	int fd, nread;
-  const char *fifo_name = "requests";
-  char buf[256] ;
-  fd = open(fifo_name, O_RDONLY);
-  
+	int nread;
+  char buf[256];
+	req = mkfifo(fifo_name, 0660);
+	if(req != 0)
+		perror("\n Request FIFO make");
+
+  req = open(fifo_name, O_RDONLY);
+		perror("\n Request FIFO open");
+
   int iteration = 0;
 	while(1) {
-	
-    memset(buf, 0, 256);
-    
-    if(read(fd, buf, 256)>0){
-   		printf("%d - %s\n", iteration, buf);
-   		//TODO:Get request information from fifo here   		
-    }
-		
+		printf("\n Waiting for requests..\n");
+//    memset(buf, 0, 256);
+
+    if(readline(req, buf)) {
+			// send request to a channel
+
+			// debugging
+			printf("Request received: %s\n", buf);
+		}
     iteration++;
-    sleep(1);
+    sleep(3);
 	}
+}
+
+int readline(int fd, char *str) {
+  int n;
+  do {
+    n = read(fd,str,1);
+  } while(n>0 && *str++ != '\0');
+
+  return (n>0);
 }
 
 int initializeSeats(){
@@ -187,15 +213,17 @@ int main(int argc, char* argv[]) {
     printf("ERROR: wrong number of arguments\n Try [options] <pattern> <filepath>\n");
     return -1;
   }
-  
+
 	num_room_seats = atoi(argv[1]);
 	num_ticket_offices = atoi(argv[2]);
 	open_time = atoi(argv[3]);
-	
-	
+
+	atexit(closeFIFO);
+  signal(SIGINT, closeFIFO);
+
 	initializeSeats();
-	
-	
+
+
 	printf("\n Openning Store\n");
 	pthread_t mainThreadId;
   int err;
@@ -206,8 +234,8 @@ int main(int argc, char* argv[]) {
 	}
 	else{
 		printf("\n Store Opened\n");
-		pthread_join(mainThreadId, NULL); 
-	}   
-	  
+		pthread_join(mainThreadId, NULL);
+	}
+
   return 0;
 }
