@@ -167,7 +167,8 @@ void * receiveClientRequests(void * arg) {
 
 	//reading from FIFO
 	int nread;
-	char buf[256];
+	char buf[256], request_pid[10], request_numseats[10], request_seats[100];
+
 	req = mkfifo(fifo_name, 0660);
 	if(req != 0)
 		perror("\n Request FIFO make");
@@ -177,17 +178,32 @@ void * receiveClientRequests(void * arg) {
 
   int iteration = 0;
 	while(1) {
-
 		memset(buf, 0, 256);
 
-    if(readline(req, buf)) {
-			char request_pid[10], request_numseats[10], request_seats[100];
+    if(readRequests(buf)) {
+			memset(request_pid, 0, 10);
+			memset(request_numseats, 0, 10);
+			memset(request_seats, 0, 100);
 
-			if(!(sscanf(buf, "PID: %s NumSeats: %s Seats: %s", request_pid, request_numseats, request_seats))) {
-				printf("\n Invalid request\n");
+			if(!(sscanf(buf, "PID: %s NumSeats: %s Seats: %s", request_pid, request_numseats, request_seats)) || atoi(request_pid) == 0) {
+				//printf("\n Invalid request\n");
 			}
+
 			else {
 				printf("\n Request received: %s\n", buf);
+
+				// extracting request
+				int req_pid, req_numseats, req_seats[10];
+				int c, bytesread, seat_arr_c = 0;
+				char* tmp_seat_list = request_seats;
+
+				while(sscanf(tmp_seat_list, "%d%n", &c, &bytesread) > 0) {
+					req_seats[seat_arr_c++] = c;
+					tmp_seat_list += bytesread;
+				}
+
+				req_pid = atoi(request_pid);
+				req_numseats = atoi(request_numseats);
 
 				// send request to a channel
 
@@ -200,13 +216,13 @@ void * receiveClientRequests(void * arg) {
 	}
 }
 
-int readline(int fd, char *str) {
+int readRequests(char *str) {
   int n;
   do {
-    n = read(fd,str,1);
+    n = read(req,str,1);
   } while(n>0 && *str++ != '\0');
 
-  return (n>0 && strlen(str)==0);
+  return (n>0);
 }
 
 int initializeSeats(){
