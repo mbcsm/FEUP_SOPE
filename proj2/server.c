@@ -20,14 +20,16 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 int req,
 		num_room_seats,
 		num_ticket_offices,
+		booths_open = 0,
 		open_time,
+		totalSeatsTaken = 0;
 		total_requests = 0,
 		total_requests_responded = 0;
 
 const char *fifo_name = "requests";
 
 struct Seat {
-	int clientId;
+  int clientId;
   int taken;
   int seat;
   pthread_mutex_t mtx;
@@ -36,6 +38,8 @@ struct Seat {
 struct Request {
 	int seatsWanted[MAX_CLI_SEATS];
 	int numSeatsWanted;
+	int pid;
+	int requestId;
 } request[1000];
 
 void closeFIFO() {
@@ -55,29 +59,43 @@ int * isSeatFree(int seatNum) {
 void bookSeat(int seatNum, int clientId){
 	seat[seatNum].clientId = clientId;
 	seat[seatNum].taken = 1;
+	totalSeatsTaken++;
 }
 
 void freeSeat(int seatNum){
 	seat[seatNum].taken = 0;
-
+	totalSeatsTaken--;
 }
 
 void *createThreadForTicketBooth(void *arg){
+  int boothNumber = *((int *) arg);
   unsigned long i = 0;
   pthread_t threadId = pthread_self();
 
+	printf("%d - OPEN\n", boothNumber);
 
   while(true){
 		pthread_mutex_lock(&lock);
 		pthread_cond_wait(&cv, &lock);
 		int requestToCheck = total_requests_responded;
 		total_requests_responded++;
+		if(num_room_seats - totalSeatsTaken < request[requestToCheck].numSeatsWanted){
+
+		}
 		pthread_mutex_unlock(&lock);
 
-		printf("%d - %d - ", threadId, request[requestToCheck].numSeatsWanted);
+	
+		printf("%d-%d-%d: ", boothNumber, request[requestToCheck].pid,request[requestToCheck].numSeatsWanted);
 		for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
 			printf("%d ", request[requestToCheck].seatsWanted[i]);
 		}
+
+		pthread_mutex_lock(&lock);
+		if(num_room_seats - totalSeatsTaken < request[requestToCheck].numSeatsWanted){
+				printf(" - FUL \n");
+				continue;
+		}
+		pthread_mutex_unlock(&lock);
 
 		int seatNotFree = 0;
 		for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
@@ -125,17 +143,19 @@ void * receiveClientRequests(void * arg) {
 	printf("\n Openning [%d] Booths\n", num_ticket_offices);
 	for(int i = 0; i < num_ticket_offices; i++){
 			int err;
-			err = pthread_create(&(tid[i]), NULL, createThreadForTicketBooth, NULL);
+			int *arg = malloc(sizeof(*arg));
+      *arg = i;
+			err = pthread_create(&(tid[i]), NULL, createThreadForTicketBooth, arg);
 			if (err != 0){
 				printf("\ncan't create thread :[%s]", strerror(err));
 				return NULL;
 			}
 			else{
-				printf("\n Booth Openned successfully\n");
 			}
 	}
 
 
+        
 
 	//test manual unlock of booths, for testing purposes only!!!!!
 	/*
@@ -180,7 +200,7 @@ void * receiveClientRequests(void * arg) {
 	while(1) {
 		memset(buf, 0, 256);
 
-    if(readRequests(buf)) {
+   if(readRequests(buf)) {
 			memset(request_pid, 0, 10);
 			memset(request_numseats, 0, 10);
 			memset(request_seats, 0, 100);
@@ -190,20 +210,43 @@ void * receiveClientRequests(void * arg) {
 			}
 
 			else {
-				printf("\n Request received: %s\n", buf);
+				//printf("\n Request received: %s\n", buf);
 
 				// extracting request
 				int req_pid, req_numseats, req_seats[10];
 				int c, bytesread, seat_arr_c = 0;
 				char* tmp_seat_list = request_seats;
 
-				while(sscanf(tmp_seat_list, "%d%n", &c, &bytesread) > 0) {
-					req_seats[seat_arr_c++] = c;
-					tmp_seat_list += bytesread;
-				}
+				sscanf(buf, "PID: %s NumSeats: %s Seats: %s", request_pid, request_numseats, request_seats);
 
-				req_pid = atoi(request_pid);
-				req_numseats = atoi(request_numseats);
+				char *p = buf;
+				int it = 0, seatsWanted = 0;
+				while (*p) {
+						if (isdigit(*p)) {
+							int val = strtol(p, &p, 10);
+							switch(it){
+								case 0:
+									request[total_requests].pid = val;
+									break;
+								case 1:
+									request[total_requests].requestId = val;
+									break;
+								case 2:
+									request[total_requests].numSeatsWanted = val;
+									break;
+								default:
+									request[total_requests].seatsWanted[seatsWanted] = val;
+									seatsWanted++;
+									break;
+							}
+							it++;
+						} else {
+								p++;
+						}
+				}
+		
+				pthread_cond_signal(&cv);
+
 
 				// send request to a channel
 
@@ -211,7 +254,6 @@ void * receiveClientRequests(void * arg) {
 		}
 
     iteration++;
-		printf("\n Waiting for requests..\n");
     sleep(3);
 	}
 }
