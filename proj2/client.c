@@ -10,7 +10,7 @@
 #include <sys/file.h>
 #include "header.h"
 
-int ansfifo, clog;
+int ansfifo, clog, cbook;
 char fifo_name[FIFO_LEN+1];
 char pid[WIDTH_PID];
 
@@ -103,6 +103,7 @@ int main(int argc, char* argv[]) {
 
   // write server answer to clog.txt
   clog = open("clog.txt", O_WRONLY | O_CREAT, 0644);
+  cbook = open("cbook.txt", O_WRONLY | O_CREAT, 0644);
   char answer[256];
   readline(ansfifo, answer);
   answer_handler(answer);
@@ -111,7 +112,7 @@ int main(int argc, char* argv[]) {
 }
 
 /*
-* se valido, a resposta Ã©
+* se valido, a resposta é
 * NUM_LUGARES_RESERVADOS RESERVA1 RESERVA2 RESERVA3 etc
 * ex: 3 12 13 14
 */
@@ -141,17 +142,22 @@ void answer_handler(char* answer) {
 	// write to clog.txt if valid answer
 	counter = 1;
 	char clog_msg[30];
+	char cbook_msg[10];
 	while(counter < num_ints) {
-		write(clog, pid, sizeof(pid));
-		sprintf(clog_msg, " %d.%d %d\n", counter, num_ints, answer[counter]);
-		write(clog, clog_msg, sizeof(clog_msg)); 
+		sprintf(clog_msg, "%d %d.%d %d\n", pid, counter, num_ints, answer_arr[counter]);
+		write(clog, clog_msg, sizeof(clog_msg));
+		
+		sprintf(cbook_msg, "%d\n", answer_arr[counter]);
+		write(cbook, cbook_msg, sizeof(cbook_msg));
+		
+		counter++;
 	}
 	
 }
 
-/* se invalido, a resposta recebida Ã© um int
-* -1: qnt de lugares pedidos Ã© maior que o MAX_CLI_SEATS
-* -2: numero de identificadores dos lugares pretendidos nao Ã© valido
+/* se invalido, a resposta recebida é um int
+* -1: qnt de lugares pedidos é maior que o MAX_CLI_SEATS
+* -2: numero de identificadores dos lugares pretendidos nao é valido
 * -3: os identificadores dos lugares pretendidos nao sao validos
 * -4: outros erros
 * -5: pelos menos um dos lugares nao esta disponivel
