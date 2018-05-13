@@ -10,8 +10,9 @@
 #include <sys/file.h>
 #include "header.h"
 
-int ansfifo;
+int ansfifo, clog;
 char fifo_name[FIFO_LEN+1];
+char pid[WIDTH_PID];
 
 int readline(int fd, char *str) {
   int n;
@@ -44,7 +45,6 @@ int main(int argc, char* argv[]) {
   atexit(closeFIFO);
   signal(SIGINT, closeFIFO);
 
-  char pid[WIDTH_PID];
   sprintf(pid, "%d", getpid());
 
   // Read args
@@ -101,7 +101,8 @@ int main(int argc, char* argv[]) {
   ansfifo = open(fifo_name, O_RDONLY);
   perror("ansfifo open");
 
-  // write to clog.txt
+  // write server answer to clog.txt
+  clog = open("clog.txt", O_WRONLY | O_CREAT, 0644);
   char answer[256];
   readline(ansfifo, answer);
   answer_handler(answer);
@@ -115,28 +116,37 @@ int main(int argc, char* argv[]) {
 * ex: 3 12 13 14
 */
 void answer_handler(char* answer) {
-  int bytesread, d, counter = 0;
-  int answer_arr[20];
-  char* tmp_answer = answer;
+	int bytesread, d, counter = 0;
+	int answer_arr[20];
+	char* tmp_answer = answer;
 
-  while(sscanf(tmp_answer, "%d%n", &d, &bytesread) > 0) {
-    answer_arr[counter++] = d;
-    tmp_answer += bytesread;
-  }
+	while(sscanf(tmp_answer, "%d%n", &d, &bytesread) > 0) {
+		answer_arr[counter++] = d;
+		tmp_answer += bytesread;
+	}
 
-  // debugging
-  int num_ints = counter;
-  counter = 0;
-  while(counter < num_ints) {
-    printf("ANSWER: %d\n", answer_arr[counter]);
-    counter++;
-  }
+	// debugging
+	int num_ints = counter;
+	counter = 0;
+	while(counter < num_ints) {
+		printf("ANSWER: %d\n", answer_arr[counter]);
+		counter++;
+	}
 
-  if(answer_arr[0] < 0)
-    invAnswer_handler(answer_arr[0]);
-
-
-
+	if(answer_arr[0] < 0) {
+		invAnswer_handler(answer_arr[0]);
+		return;
+	}
+	
+	// write to clog.txt if valid answer
+	counter = 1;
+	char clog_msg[30];
+	while(counter < num_ints) {
+		write(clog, pid, sizeof(pid));
+		sprintf(clog_msg, " %d.%d %d\n", counter, num_ints, answer[counter]);
+		write(clog, clog_msg, sizeof(clog_msg)); 
+	}
+	
 }
 
 /* se invalido, a resposta recebida é um int
@@ -148,5 +158,30 @@ void answer_handler(char* answer) {
 * -6: sala cheia
 */
 void invAnswer_handler(int err) {
-
+	char clog_msg[30];
+	
+	if(err == -1) {
+		sprintf(clog_msg, "%d MAX\n", pid) 
+		write(clog, clog_msg, sizeof(clog_msg));
+	}
+	else 	if(err == -2) {
+		sprintf(clog_msg, "%d NST\n", pid) 
+		write(clog, clog_msg, sizeof(clog_msg));
+	}
+	else 	if(err == -3) {
+		sprintf(clog_msg, "%d IID\n", pid) 
+		write(clog, clog_msg, sizeof(clog_msg));
+	}
+	else 	if(err == -4) {
+		sprintf(clog_msg, "%d ERR\n", pid) 
+		write(clog, clog_msg, sizeof(clog_msg));
+	}
+	else 	if(err == -5) {
+		sprintf(clog_msg, "%d NAV\n", pid) 
+		write(clog, clog_msg, sizeof(clog_msg));
+	}
+	else 	if(err == -6) {
+		sprintf(clog_msg, "%d FUL\n", pid) 
+		write(clog, clog_msg, sizeof(clog_msg));
+	}
 }
