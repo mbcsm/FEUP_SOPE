@@ -1,0 +1,5 @@
+project2: server.o client.o
+server.o: server.c header.h
+	cc -c server.c
+client.o: client.c header.h
+	cc -c client.c
