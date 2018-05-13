@@ -98,6 +98,7 @@ void *createThreadForTicketBooth(void *arg){
 		pthread_cond_wait(&cv, &lock);
 		int requestToCheck = total_requests_responded;
 		total_requests_responded++;
+		
 		pthread_mutex_unlock(&lock);
 
 		int error = 0;
@@ -109,6 +110,7 @@ void *createThreadForTicketBooth(void *arg){
 		snprintf(fifo_name, sizeof fifo_name, "ans%d", request[requestToCheck].pid);
     mkfifo(fifo_name, 0666);
 	
+
 		printf("%d-%d-%d: ", boothNumber, request[requestToCheck].pid,request[requestToCheck].numSeatsWanted);
 		snprintf(logText, sizeof logText, "%d-%d-%d: ", boothNumber, request[requestToCheck].pid,request[requestToCheck].numSeatsWanted);
 
@@ -117,9 +119,25 @@ void *createThreadForTicketBooth(void *arg){
 
 			int len = strlen(logText);
 			snprintf(logText + len, (sizeof logText) - len, "%d ", request[requestToCheck].seatsWanted[i]);
+
+			if(request[requestToCheck].seatsWanted[i] > num_room_seats || request[requestToCheck].seatsWanted[i] < 0){
+				error = 2;
+				fd = open(fifo_name, O_WRONLY);
+				write(fd, "NST", sizeof("NST"));
+				close(fd);
+    		unlink(fifo_name);
+				
+				int len = strlen(logText);
+				snprintf(logText + len, (sizeof logText) - len, " - NST");
+				error = 1;
+				writeToSLOG(logText);
+				printf(" - NST \n");
+				continue;
+			}
 		}
 
-		if(request[requestToCheck].numSeatsWanted > MAX_CLI_SEATS){
+
+		if(request[requestToCheck].numSeatsWanted > MAX_CLI_SEATS && error == 0){
 				fd = open(fifo_name, O_WRONLY);
 				write(fd, "MAX", sizeof("MAX"));
 				close(fd);
@@ -134,7 +152,7 @@ void *createThreadForTicketBooth(void *arg){
 	
 
 		pthread_mutex_lock(&lock);
-		if(num_room_seats - totalSeatsTaken < request[requestToCheck].numSeatsWanted){
+		if(num_room_seats - totalSeatsTaken < request[requestToCheck].numSeatsWanted && error == 0){
 		
 				fd = open(fifo_name, O_WRONLY);
 				write(fd, "FUL", sizeof("FUL"));
@@ -164,7 +182,7 @@ void *createThreadForTicketBooth(void *arg){
 				seatNotFree = 1;
 			pthread_mutex_unlock(&seat[request[requestToCheck].seatsWanted[i]].mtx);
 
-			if(seatNotFree == 1){
+			if(seatNotFree == 1 && error == 0){
 				for(int j = 0; j < i; j++ ){
 					pthread_mutex_lock(&seat[request[requestToCheck].seatsWanted[j]].mtx);
 					freeSeat(request[requestToCheck].seatsWanted[j]);
@@ -188,7 +206,7 @@ void *createThreadForTicketBooth(void *arg){
 				//Send Message To Client Saying the Seats are already taken
 			}
 		}
-		if(seatNotFree == 0){
+		if(seatNotFree == 0 && error == 0){
 			printf(" - ");
 
 			char seatsReserved[10000];
@@ -212,8 +230,6 @@ void *createThreadForTicketBooth(void *arg){
     /* remove the FIFO */
 
     return 0;
-
-		sleep(1);
   }
 
 
@@ -296,7 +312,6 @@ void * receiveClientRequests(void * arg) {
 
 			else {
 				//printf("\n Request received: %s\n", buf);
-
 				// extracting request
 				int req_pid, req_numseats, req_seats[10];
 				int c, bytesread, seat_arr_c = 0;
@@ -304,7 +319,6 @@ void * receiveClientRequests(void * arg) {
 
 				sscanf(buf, "PID: %s NumSeats: %s Seats: %s", request_pid, request_numseats, request_seats);
 
-				printf("%s\n", buf);
 				char *p = buf;
 				int it = 0, seatsWanted = 0;
 				while (*p) {
@@ -324,20 +338,14 @@ void * receiveClientRequests(void * arg) {
 							}
 							it++;
 						} else {
-								p++;
+							p++;
 						}
 				}
-		
 				pthread_cond_signal(&cv);
-
-
-				// send request to a channel
-
+				total_requests++;	
 			}
 		}
-
     iteration++;
-    sleep(3);
 	}
 }
 
