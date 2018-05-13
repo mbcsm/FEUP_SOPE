@@ -50,14 +50,36 @@ void writeToSLOG(char* logText){
 				return;
 		}
 
-		/* print some text */
 		fprintf(f, "%s\n", logText);
 
 		fclose(f);
 		return;
 }
+void writeToSBOOK(){
+		FILE *f = fopen("sbook.txt", "w");
+		if (f == NULL)
+		{
+			printf("Error opening file!\n");
+			return;
+		}
+		for(int i = 0; i < num_room_seats; i++ ){
+			if(seat[i].taken == 1){
+				if(i < 10)
+					fprintf(f, "000%d\n", i);
+				else if(i > 9 && i < 100)
+					fprintf(f, "00%d\n", i);
+				else if(i > 99 && i < 1000)
+					fprintf(f, "0%d\n", i);
+				else
+					fprintf(f, "%d\n", i);
+			}
+		}
+		fclose(f);
+		return;
+}
 
 void closeFIFO() {
+	writeToSBOOK();
   printf(".. cleaning up files ..\n");
 	close(req);
   remove(fifo_name);
@@ -221,14 +243,6 @@ void *createThreadForTicketBooth(void *arg){
 			printf("\n");
 			writeToSLOG(logText);
 		}
-
-    /* write "Hi" to the FIFO */
-
-
-
-
-    /* remove the FIFO */
-
     return 0;
   }
 
