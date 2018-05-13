@@ -108,6 +108,7 @@ void *createThreadForTicketBooth(void *arg){
 		pthread_mutex_unlock(&lock);
 
 		int seatNotFree = 0;
+		
 		for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
 			if(seatNotFree == 1)
 				continue;
@@ -150,7 +151,6 @@ void *createThreadForTicketBooth(void *arg){
 			unlink(fifo_name);
 			printf("\n");
 		}
-
 
     /* write "Hi" to the FIFO */
 
@@ -249,6 +249,7 @@ void * receiveClientRequests(void * arg) {
 
 				sscanf(buf, "PID: %s NumSeats: %s Seats: %s", request_pid, request_numseats, request_seats);
 
+				printf("%s\n", buf);
 				char *p = buf;
 				int it = 0, seatsWanted = 0;
 				while (*p) {
@@ -259,9 +260,6 @@ void * receiveClientRequests(void * arg) {
 									request[total_requests].pid = val;
 									break;
 								case 1:
-									request[total_requests].requestId = val;
-									break;
-								case 2:
 									request[total_requests].numSeatsWanted = val;
 									break;
 								default:
@@ -284,6 +282,7 @@ void * receiveClientRequests(void * arg) {
 		}
 
     iteration++;
+		printf("asd\n");
     sleep(3);
 	}
 }
