@@ -42,6 +42,21 @@ struct Request {
 	int requestId;
 } request[1000];
 
+void writeToSLOG(char* logText){
+		FILE *f = fopen("slog.txt", "a");
+		if (f == NULL)
+		{
+				printf("Error opening file!\n");
+				return;
+		}
+
+		/* print some text */
+		fprintf(f, "%s\n", logText);
+
+		fclose(f);
+		return;
+}
+
 void closeFIFO() {
   printf(".. cleaning up files ..\n");
 	close(req);
@@ -72,6 +87,10 @@ void *createThreadForTicketBooth(void *arg){
   unsigned long i = 0;
   pthread_t threadId = pthread_self();
 
+	char boothText[10000];
+	snprintf(boothText, sizeof boothText, "%d - OPEN", boothNumber);
+	writeToSLOG(boothText);
+
 	printf("%d - OPEN\n", boothNumber);
 
   while(true){
@@ -81,6 +100,8 @@ void *createThreadForTicketBooth(void *arg){
 		total_requests_responded++;
 		pthread_mutex_unlock(&lock);
 
+		int error = 0;
+		char logText[10000];
 		//open fifo
 		
 		int fd;
@@ -88,11 +109,29 @@ void *createThreadForTicketBooth(void *arg){
 		snprintf(fifo_name, sizeof fifo_name, "ans%d", request[requestToCheck].pid);
     mkfifo(fifo_name, 0666);
 	
-	
 		printf("%d-%d-%d: ", boothNumber, request[requestToCheck].pid,request[requestToCheck].numSeatsWanted);
+		snprintf(logText, sizeof logText, "%d-%d-%d: ", boothNumber, request[requestToCheck].pid,request[requestToCheck].numSeatsWanted);
+
 		for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
 			printf("%d ", request[requestToCheck].seatsWanted[i]);
+
+			int len = strlen(logText);
+			snprintf(logText + len, (sizeof logText) - len, "%d ", request[requestToCheck].seatsWanted[i]);
 		}
+
+		if(request[requestToCheck].numSeatsWanted > MAX_CLI_SEATS){
+				fd = open(fifo_name, O_WRONLY);
+				write(fd, "MAX", sizeof("MAX"));
+				close(fd);
+    		unlink(fifo_name);
+				
+				int len = strlen(logText);
+				snprintf(logText + len, (sizeof logText) - len, " - MAX");
+				error = 1;
+				writeToSLOG(logText);
+				printf(" - MAX \n");
+		}
+	
 
 		pthread_mutex_lock(&lock);
 		if(num_room_seats - totalSeatsTaken < request[requestToCheck].numSeatsWanted){
@@ -102,7 +141,13 @@ void *createThreadForTicketBooth(void *arg){
 				close(fd);
     		unlink(fifo_name);
 				
+				
+				int len = strlen(logText);
+				snprintf(logText + len, (sizeof logText) - len, " - FUL");
+
+				error = 1;
 				printf(" - FUL \n");
+				writeToSLOG(logText);
 				continue;
 		}
 		pthread_mutex_unlock(&lock);
@@ -133,7 +178,13 @@ void *createThreadForTicketBooth(void *arg){
 				close(fd);
     		unlink(fifo_name);
 
+
+				
+				int len = strlen(logText);
+				snprintf(logText + len, (sizeof logText) - len, " - NAV");
+
 				printf(" - NAV \n");
+				writeToSLOG(logText);
 				//Send Message To Client Saying the Seats are already taken
 			}
 		}
@@ -150,9 +201,13 @@ void *createThreadForTicketBooth(void *arg){
 			close(fd);
 			unlink(fifo_name);
 			printf("\n");
+			writeToSLOG(logText);
 		}
 
     /* write "Hi" to the FIFO */
+
+
+
 
     /* remove the FIFO */
 
@@ -282,7 +337,6 @@ void * receiveClientRequests(void * arg) {
 		}
 
     iteration++;
-		printf("asd\n");
     sleep(3);
 	}
 }
