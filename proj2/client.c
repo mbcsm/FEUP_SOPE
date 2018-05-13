@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) {
 }
 
 /*
-* se valido, a resposta é
+* se valido, a resposta ?
 * NUM_LUGARES_RESERVADOS RESERVA1 RESERVA2 RESERVA3 etc
 * ex: 3 12 13 14
 */
@@ -144,7 +144,7 @@ void answer_handler(char* answer) {
 	char clog_msg[30];
 	char cbook_msg[10];
 	while(counter < num_ints) {
-		sprintf(clog_msg, "%d %d.%d %d\n", pid, counter, num_ints, answer_arr[counter]);
+		sprintf(clog_msg, "%s %d.%d %d\n", pid, counter, num_ints, answer_arr[counter]);
 		write(clog, clog_msg, sizeof(clog_msg));
 		
 		sprintf(cbook_msg, "%d\n", answer_arr[counter]);
@@ -155,9 +155,9 @@ void answer_handler(char* answer) {
 	
 }
 
-/* se invalido, a resposta recebida é um int
-* -1: qnt de lugares pedidos é maior que o MAX_CLI_SEATS
-* -2: numero de identificadores dos lugares pretendidos nao é valido
+/* se invalido, a resposta recebida ? um int
+* -1: qnt de lugares pedidos ? maior que o MAX_CLI_SEATS
+* -2: numero de identificadores dos lugares pretendidos nao ? valido
 * -3: os identificadores dos lugares pretendidos nao sao validos
 * -4: outros erros
 * -5: pelos menos um dos lugares nao esta disponivel
@@ -167,27 +167,27 @@ void invAnswer_handler(int err) {
 	char clog_msg[30];
 	
 	if(err == -1) {
-		sprintf(clog_msg, "%d MAX\n", pid) 
+		sprintf(clog_msg, "%s MAX\n", pid) 
 		write(clog, clog_msg, sizeof(clog_msg));
 	}
 	else 	if(err == -2) {
-		sprintf(clog_msg, "%d NST\n", pid) 
+		sprintf(clog_msg, "%s NST\n", pid) 
 		write(clog, clog_msg, sizeof(clog_msg));
 	}
 	else 	if(err == -3) {
-		sprintf(clog_msg, "%d IID\n", pid) 
+		sprintf(clog_msg, "%s IID\n", pid) 
 		write(clog, clog_msg, sizeof(clog_msg));
 	}
 	else 	if(err == -4) {
-		sprintf(clog_msg, "%d ERR\n", pid) 
+		sprintf(clog_msg, "%s ERR\n", pid) 
 		write(clog, clog_msg, sizeof(clog_msg));
 	}
 	else 	if(err == -5) {
-		sprintf(clog_msg, "%d NAV\n", pid) 
+		sprintf(clog_msg, "%s NAV\n", pid) 
 		write(clog, clog_msg, sizeof(clog_msg));
 	}
 	else 	if(err == -6) {
-		sprintf(clog_msg, "%d FUL\n", pid) 
+		sprintf(clog_msg, "%s FUL\n", pid) 
 		write(clog, clog_msg, sizeof(clog_msg));
 	}
 }
