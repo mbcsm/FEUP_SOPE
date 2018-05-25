@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
   int num_wanted_seats = atoi(argv[2]);
   char* pref_seat_list = argv[3];
   char* tmp_seat_list = pref_seat_list;
-  int seat_arr[10];
+  int seat_arr[1000];
   int c, bytesread, seat_arr_c = 0;
 
   // debugging
@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
   printf("Opened main FIFO.. sending request now\n");
 
   // Send request
-  char msg[100];
+  char msg[3000];
   sprintf(msg, "PID: %s NumSeats: %d Seats: %s", pid, num_wanted_seats, pref_seat_list);
   printf("Request is '"); printf(msg); printf("'\n");
   write(req, msg, sizeof(msg));
@@ -104,10 +104,14 @@ int main(int argc, char* argv[]) {
   // write server answer to clog.txt
   clog = open("clog.txt", O_WRONLY | O_CREAT, 0644);
   cbook = open("cbook.txt", O_WRONLY | O_CREAT, 0644);
-  char answer[256];
-  readline(ansfifo, answer);
-  answer_handler(answer);
-
+  char answer[3000];
+  while(1) {
+    memset(answer, 0 , 3000);
+    if(readline(ansfifo, answer)) {
+      if(answer_handler(answer) != -1)
+        break;
+    }
+  }
   exit(0);
 }
 
@@ -116,7 +120,7 @@ int main(int argc, char* argv[]) {
 * NUM_LUGARES_RESERVADOS RESERVA1 RESERVA2 RESERVA3 etc
 * ex: 3 12 13 14
 */
-void answer_handler(char* answer) {
+int answer_handler(char* answer) {
 	int bytesread, d, counter = 0;
 	int answer_arr[20];
 	char* tmp_answer = answer;
@@ -126,19 +130,23 @@ void answer_handler(char* answer) {
 		tmp_answer += bytesread;
 	}
 
+  if(counter < 4) return -1;
+
 	// debugging
 	int num_ints = counter;
 	counter = 0;
+  printf("ANSWER: ");
 	while(counter < num_ints) {
-		printf("ANSWER: %d\n", answer_arr[counter]);
+		printf("%d", answer_arr[counter]);
 		counter++;
 	}
+  printf("\n");
 
 	if(answer_arr[0] < 0) {
 		invAnswer_handler(answer_arr[0]);
-		return;
+		return -1;
 	}
-	
+
 	// write to clog.txt if valid answer
 	counter = 1;
 	char clog_msg[30];
@@ -146,13 +154,13 @@ void answer_handler(char* answer) {
 	while(counter < num_ints) {
 		sprintf(clog_msg, "%s %d.%d %d\n", pid, counter, num_ints, answer_arr[counter]);
 		write(clog, clog_msg, sizeof(clog_msg));
-		
+
 		sprintf(cbook_msg, "%d\n", answer_arr[counter]);
 		write(cbook, cbook_msg, sizeof(cbook_msg));
-		
+
 		counter++;
 	}
-	
+  return 0;
 }
 
 /* se invalido, a resposta recebida ? um int
@@ -165,29 +173,29 @@ void answer_handler(char* answer) {
 */
 void invAnswer_handler(int err) {
 	char clog_msg[30];
-	
+
 	if(err == -1) {
-		sprintf(clog_msg, "%s MAX\n", pid) 
+		sprintf(clog_msg, "%s MAX\n", pid);
 		write(clog, clog_msg, sizeof(clog_msg));
 	}
 	else 	if(err == -2) {
-		sprintf(clog_msg, "%s NST\n", pid) 
+		sprintf(clog_msg, "%s NST\n", pid);
 		write(clog, clog_msg, sizeof(clog_msg));
 	}
 	else 	if(err == -3) {
-		sprintf(clog_msg, "%s IID\n", pid) 
+		sprintf(clog_msg, "%s IID\n", pid);
 		write(clog, clog_msg, sizeof(clog_msg));
 	}
 	else 	if(err == -4) {
-		sprintf(clog_msg, "%s ERR\n", pid) 
+		sprintf(clog_msg, "%s ERR\n", pid);
 		write(clog, clog_msg, sizeof(clog_msg));
 	}
 	else 	if(err == -5) {
-		sprintf(clog_msg, "%s NAV\n", pid) 
+		sprintf(clog_msg, "%s NAV\n", pid);
 		write(clog, clog_msg, sizeof(clog_msg));
 	}
 	else 	if(err == -6) {
-		sprintf(clog_msg, "%s FUL\n", pid) 
+		sprintf(clog_msg, "%s FUL\n", pid);
 		write(clog, clog_msg, sizeof(clog_msg));
 	}
 }

@@ -120,18 +120,17 @@ void *createThreadForTicketBooth(void *arg){
 		pthread_cond_wait(&cv, &lock);
 		int requestToCheck = total_requests_responded;
 		total_requests_responded++;
-		
+
 		pthread_mutex_unlock(&lock);
 
 		int error = 0;
 		char logText[10000];
 		//open fifo
-		
+
 		int fd;
-		char fifo_name[FIFO_LEN+1];
-		snprintf(fifo_name, sizeof fifo_name, "ans%d", request[requestToCheck].pid);
-    mkfifo(fifo_name, 0666);
-	
+		char ansfifo_name[FIFO_LEN+1];
+		snprintf(ansfifo_name, sizeof ansfifo_name, "ans%d", request[requestToCheck].pid);
+    mkfifo(ansfifo_name, 0666);
 
 		printf("%d-%d-%d: ", boothNumber, request[requestToCheck].pid,request[requestToCheck].numSeatsWanted);
 		snprintf(logText, sizeof logText, "%d-%d-%d: ", boothNumber, request[requestToCheck].pid,request[requestToCheck].numSeatsWanted);
@@ -144,11 +143,11 @@ void *createThreadForTicketBooth(void *arg){
 
 			if(request[requestToCheck].seatsWanted[i] > num_room_seats || request[requestToCheck].seatsWanted[i] < 0){
 				error = 2;
-				fd = open(fifo_name, O_WRONLY);
+				fd = open(ansfifo_name, O_WRONLY);
 				write(fd, "NST", sizeof("NST"));
 				close(fd);
-    		unlink(fifo_name);
-				
+    		unlink(ansfifo_name);
+
 				int len = strlen(logText);
 				snprintf(logText + len, (sizeof logText) - len, " - NST");
 				error = 1;
@@ -160,28 +159,28 @@ void *createThreadForTicketBooth(void *arg){
 
 
 		if(request[requestToCheck].numSeatsWanted > MAX_CLI_SEATS && error == 0){
-				fd = open(fifo_name, O_WRONLY);
+				fd = open(ansfifo_name, O_WRONLY);
 				write(fd, "MAX", sizeof("MAX"));
 				close(fd);
-    		unlink(fifo_name);
-				
+    		unlink(ansfifo_name);
+
 				int len = strlen(logText);
 				snprintf(logText + len, (sizeof logText) - len, " - MAX");
 				error = 1;
 				writeToSLOG(logText);
 				printf(" - MAX \n");
 		}
-	
+
 
 		pthread_mutex_lock(&lock);
 		if(num_room_seats - totalSeatsTaken < request[requestToCheck].numSeatsWanted && error == 0){
-		
-				fd = open(fifo_name, O_WRONLY);
+
+				fd = open(ansfifo_name, O_WRONLY);
 				write(fd, "FUL", sizeof("FUL"));
 				close(fd);
-    		unlink(fifo_name);
-				
-				
+    		unlink(ansfifo_name);
+
+
 				int len = strlen(logText);
 				snprintf(logText + len, (sizeof logText) - len, " - FUL");
 
@@ -193,7 +192,7 @@ void *createThreadForTicketBooth(void *arg){
 		pthread_mutex_unlock(&lock);
 
 		int seatNotFree = 0;
-		
+
 		for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
 			if(seatNotFree == 1)
 				continue;
@@ -212,14 +211,14 @@ void *createThreadForTicketBooth(void *arg){
 					i = 999;
 				}
 
-		
-				fd = open(fifo_name, O_WRONLY);
+
+				fd = open(ansfifo_name, O_WRONLY);
 				write(fd, "NAV", sizeof("NAV"));
 				close(fd);
-    		unlink(fifo_name);
+    		unlink(ansfifo_name);
 
 
-				
+
 				int len = strlen(logText);
 				snprintf(logText + len, (sizeof logText) - len, " - NAV");
 
@@ -236,10 +235,11 @@ void *createThreadForTicketBooth(void *arg){
 				printf("%d ", request[requestToCheck].seatsWanted[i]);
 				snprintf(seatsReserved, sizeof seatsReserved, "%d ", request[requestToCheck].seatsWanted[i]);
 			}
-			fd = open(fifo_name, O_WRONLY);
+			fd = open(ansfifo_name, O_WRONLY);
+			perror("\n ansfifo open");
 			write(fd, request, sizeof(request));
 			close(fd);
-			unlink(fifo_name);
+			unlink(ansfifo_name);
 			printf("\n");
 			writeToSLOG(logText);
 		}
@@ -270,7 +270,7 @@ void * receiveClientRequests(void * arg) {
 	}
 
 
-        
+
 
 	//test manual unlock of booths, for testing purposes only!!!!!
 	/*
@@ -302,7 +302,7 @@ void * receiveClientRequests(void * arg) {
 
 	//reading from FIFO
 	int nread;
-	char buf[256], request_pid[10], request_numseats[10], request_seats[100];
+	char buf[3000], request_pid[10], request_numseats[1000], request_seats[1000];
 
 	req = mkfifo(fifo_name, 0660);
 	if(req != 0)
@@ -313,19 +313,19 @@ void * receiveClientRequests(void * arg) {
 
   int iteration = 0;
 	while(1) {
-		memset(buf, 0, 256);
+		memset(buf, 0, 3000);
 
    if(readRequests(buf)) {
 			memset(request_pid, 0, 10);
-			memset(request_numseats, 0, 10);
-			memset(request_seats, 0, 100);
+			memset(request_numseats, 0, 1000);
+			memset(request_seats, 0, 1000);
 
 			if(!(sscanf(buf, "PID: %s NumSeats: %s Seats: %s", request_pid, request_numseats, request_seats)) || atoi(request_pid) == 0) {
 				//printf("\n Invalid request\n");
 			}
 
 			else {
-				//printf("\n Request received: %s\n", buf);
+				printf("\n Request received: %s\n", buf);
 				// extracting request
 				int req_pid, req_numseats, req_seats[10];
 				int c, bytesread, seat_arr_c = 0;
@@ -356,7 +356,7 @@ void * receiveClientRequests(void * arg) {
 						}
 				}
 				pthread_cond_signal(&cv);
-				total_requests++;	
+				total_requests++;
 			}
 		}
     iteration++;
