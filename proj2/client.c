@@ -153,49 +153,6 @@ int main(int argc, char* argv[]) {
   exit(0);
 }
 
-/*
-* se valido, a resposta ?
-* NUM_LUGARES_RESERVADOS RESERVA1 RESERVA2 RESERVA3 etc
-* ex: 3 12 13 14
-*/
-int answer_handler(char* answer) {
-	int bytesread, d, counter = 0;
-	int answer_arr[20];
-	char* tmp_answer = answer;
-	
-	sscanf(
-
-	// debugging
-	int num_ints = counter;
-	counter = 0;
-  printf("ANSWER: ");
-	while(counter < num_ints) {
-		printf("%d", answer_arr[counter]);
-		counter++;
-	}
-  printf("\n");
-
-	if(answer_arr[0] < 0) {
-		invAnswer_handler(answer_arr[0]);
-		return -1;
-	}
-
-	// write to clog.txt if valid answer
-	counter = 1;
-	char clog_msg[30];
-	char cbook_msg[10];
-	while(counter < num_ints) {
-		sprintf(clog_msg, "%s %d.%d %d\n", pid, counter, num_ints, answer_arr[counter]);
-		write(clog, clog_msg, sizeof(clog_msg));
-
-		sprintf(cbook_msg, "%d\n", answer_arr[counter]);
-		write(cbook, cbook_msg, sizeof(cbook_msg));
-
-		counter++;
-	}
-  return 0;
-}
-
 /* se invalido, a resposta recebida ? um int
 * -1: qnt de lugares pedidos ? maior que o MAX_CLI_SEATS
 * -2: numero de identificadores dos lugares pretendidos nao ? valido
