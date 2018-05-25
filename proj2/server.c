@@ -88,21 +88,22 @@ void closeFIFO() {
 }
 
 int * isSeatFree(int seatNum) {
-		if(seat[seatNum].taken == 1){
-			return 1;
-		}
-	return 0;
+	return seat[seatNum].taken;
 }
 
 void bookSeat(int seatNum, int clientId){
 	seat[seatNum].clientId = clientId;
 	seat[seatNum].taken = 1;
+	pthread_mutex_lock(&lock);
 	totalSeatsTaken++;
+	pthread_mutex_unlock(&lock);
 }
 
 void freeSeat(int seatNum){
 	seat[seatNum].taken = 0;
+	pthread_mutex_lock(&lock);
 	totalSeatsTaken--;
+	pthread_mutex_unlock(&lock);
 }
 
 void *createThreadForTicketBooth(void *arg){
@@ -199,24 +200,24 @@ void *createThreadForTicketBooth(void *arg){
 		
 			if(request[requestToCheck].numSeatsWanted == totalSeatsReserved)
 				continue;
+				
 			pthread_mutex_lock(&seat[request[requestToCheck].seatsWanted[i]].mtx);
 			if(isSeatFree(request[requestToCheck].seatsWanted[i])==0){
+				//printf("|%d-%d|", request[requestToCheck].seatsWanted[i], isSeatFree(request[requestToCheck].seatsWanted[i]));
 				totalSeatsReserved++;
-				bookSeat(request[requestToCheck].seatsWanted[i], requestToCheck);
+				bookSeat(request[requestToCheck].seatsWanted[i], request[requestToCheck].pid);
 			}
 			pthread_mutex_unlock(&seat[request[requestToCheck].seatsWanted[i]].mtx);
 				
 			
 		}
-		
 		if(request[requestToCheck].numSeatsWanted != totalSeatsReserved){
-	
 			error = 1;
-			for(int j = 0; j < i; j++ ){
+			for(int j = 0; j < request[requestToCheck].numSeats; j++ ){
 					pthread_mutex_lock(&seat[request[requestToCheck].seatsWanted[j]].mtx);
-					freeSeat(request[requestToCheck].seatsWanted[j]);
+					if(seat[request[requestToCheck].seatsWanted[j]].clientId == request[requestToCheck].pid)
+						freeSeat(request[requestToCheck].seatsWanted[j]);
 					pthread_mutex_unlock(&seat[request[requestToCheck].seatsWanted[j]].mtx);
-					i = 999;
 				}
 
 
@@ -241,10 +242,15 @@ void *createThreadForTicketBooth(void *arg){
 
 			char seatsReserved[10000];
 			int numSeatsReserved = 0;
-			for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
-				printf("%d ", request[requestToCheck].seatsWanted[i]);
-				snprintf(seatsReserved, sizeof seatsReserved, "%d ", request[requestToCheck].seatsWanted[i]);
-				numSeatsReserved++;
+			for(int j = 0; j < request[requestToCheck].numSeats; j++ ){
+					pthread_mutex_lock(&seat[request[requestToCheck].seatsWanted[j]].mtx);
+					if(seat[request[requestToCheck].seatsWanted[j]].clientId == request[requestToCheck].pid){
+						printf("%d ", request[requestToCheck].seatsWanted[j]);
+						snprintf(seatsReserved, sizeof seatsReserved, "%d ", request[requestToCheck].seatsWanted[j]);
+						numSeatsReserved++;
+					}
+					pthread_mutex_unlock(&seat[request[requestToCheck].seatsWanted[j]].mtx);
+				
 			}
 			fd = open(ansfifo_name, O_WRONLY);
 			char msg[1000];
