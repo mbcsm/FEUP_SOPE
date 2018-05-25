@@ -38,6 +38,7 @@ struct Seat {
 struct Request {
 	int seatsWanted[MAX_CLI_SEATS];
 	int numSeatsWanted;
+	int numSeats;
 	int pid;
 	int requestId;
 } request[1000];
@@ -135,7 +136,7 @@ void *createThreadForTicketBooth(void *arg){
 		printf("%d-%d-%d: ", boothNumber, request[requestToCheck].pid,request[requestToCheck].numSeatsWanted);
 		snprintf(logText, sizeof logText, "%d-%d-%d: ", boothNumber, request[requestToCheck].pid,request[requestToCheck].numSeatsWanted);
 
-		for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
+		for(int i = 0; i < request[requestToCheck].numSeats; i++ ){
 			printf("%d ", request[requestToCheck].seatsWanted[i]);
 
 			int len = strlen(logText);
@@ -169,6 +170,7 @@ void *createThreadForTicketBooth(void *arg){
 				error = 1;
 				writeToSLOG(logText);
 				printf(" - MAX \n");
+				continue;
 		}
 
 
@@ -191,20 +193,26 @@ void *createThreadForTicketBooth(void *arg){
 		}
 		pthread_mutex_unlock(&lock);
 
-		int seatNotFree = 0;
+		int totalSeatsReserved = 0;
 
-		for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
-			if(seatNotFree == 1)
+		for(int i = 0; i < request[requestToCheck].numSeats; i++ ){
+		
+			if(request[requestToCheck].numSeatsWanted == totalSeatsReserved)
 				continue;
 			pthread_mutex_lock(&seat[request[requestToCheck].seatsWanted[i]].mtx);
-			if(isSeatFree(request[requestToCheck].seatsWanted[i])==0)
+			if(isSeatFree(request[requestToCheck].seatsWanted[i])==0){
+				totalSeatsReserved++;
 				bookSeat(request[requestToCheck].seatsWanted[i], requestToCheck);
-			else
-				seatNotFree = 1;
+			}
 			pthread_mutex_unlock(&seat[request[requestToCheck].seatsWanted[i]].mtx);
-
-			if(seatNotFree == 1 && error == 0){
-				for(int j = 0; j < i; j++ ){
+				
+			
+		}
+		
+		if(request[requestToCheck].numSeatsWanted != totalSeatsReserved){
+	
+			error = 1;
+			for(int j = 0; j < i; j++ ){
 					pthread_mutex_lock(&seat[request[requestToCheck].seatsWanted[j]].mtx);
 					freeSeat(request[requestToCheck].seatsWanted[j]);
 					pthread_mutex_unlock(&seat[request[requestToCheck].seatsWanted[j]].mtx);
@@ -224,10 +232,11 @@ void *createThreadForTicketBooth(void *arg){
 
 				printf(" - NAV \n");
 				writeToSLOG(logText);
+				continue;
 				//Send Message To Client Saying the Seats are already taken
-			}
-			
-			if(seatNotFree == 0 && error == 0){
+		}
+		
+		if(error == 0){
 			printf(" - ");
 
 			char seatsReserved[10000];
@@ -248,13 +257,9 @@ void *createThreadForTicketBooth(void *arg){
 		}
 	}
 		
-    return 0;
-  }
-
-
-
-  return NULL;
+	return NULL;
 }
+
 
 void * receiveClientRequests(void * arg) {
   //opening booths threads
@@ -330,7 +335,7 @@ void * receiveClientRequests(void * arg) {
 			}
 
 			else {
-				printf("\n Request received: %s\n", buf);
+				//printf("\n Request received: %s\n", buf);
 				// extracting request
 				int req_pid, req_numseats, req_seats[10];
 				int c, bytesread, seat_arr_c = 0;
@@ -352,6 +357,7 @@ void * receiveClientRequests(void * arg) {
 									break;
 								default:
 									request[total_requests].seatsWanted[seatsWanted] = val;
+									request[total_requests].numSeats = seatsWanted + 1;
 									seatsWanted++;
 									break;
 							}
