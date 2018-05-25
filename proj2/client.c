@@ -104,12 +104,50 @@ int main(int argc, char* argv[]) {
   // write server answer to clog.txt
   clog = open("clog.txt", O_WRONLY | O_CREAT, 0644);
   cbook = open("cbook.txt", O_WRONLY | O_CREAT, 0644);
+  
   char answer[3000];
+  char answerNumSeats[10], answerSeats[100], answerErr[10];
   while(1) {
     memset(answer, 0 , 3000);
+	
     if(readline(ansfifo, answer)) {
-      if(answer_handler(answer) != -1)
-        break;
+		memset(answerNumSeats, 0 , 10);
+		memset(answerSeats, 0 , 100);
+		
+		if(!(sscanf(buf, "NumSeats: %s Seats: %s", answerNumSeats, answerSeats))) {
+				//printf("\n Invalid request\n");
+				memset(answerErr, 0, 10);
+				sscanf(buf, "%s", answerErr);
+				int err = atoi(answerErr);
+				if(err < 0) invAnswer_handler(err);
+			}
+		else {
+			sscanf(buf, "NumSeats: %s Seats: %s", answerNumSeats, answerSeats);
+			
+			// extract msg
+			int nSeats = atoi(answerNumSeats);
+			int seats_arr[100];
+			int c, bytesread, seat_arr_c = 0;;
+			char* tmp_seat_list = answerSeats;
+			while(sscanf(tmp_seat_list, "%d%n", &c, &bytesread) > 0) {
+				seats_arr[seat_arr_c++] = c;
+				tmp_seat_list += bytesread;
+			}
+			
+			// write to clog.txt
+			counter = 1;
+			char clog_msg[300];
+			char cbook_msg[100];
+			while(counter < nSeats) {
+				sprintf(clog_msg, "%s %d.%d %d\n", pid, counter, nSeats, seats_arr[counter]);
+				write(clog, clog_msg, sizeof(clog_msg));
+
+				sprintf(cbook_msg, "%d\n", seats_arr[counter]);
+				write(cbook, cbook_msg, sizeof(cbook_msg));
+
+				counter++;
+			}
+		}
     }
   }
   exit(0);
@@ -124,13 +162,8 @@ int answer_handler(char* answer) {
 	int bytesread, d, counter = 0;
 	int answer_arr[20];
 	char* tmp_answer = answer;
-
-	while(sscanf(tmp_answer, "%d%n", &d, &bytesread) > 0) {
-		answer_arr[counter++] = d;
-		tmp_answer += bytesread;
-	}
-
-  if(counter < 4) return -1;
+	
+	sscanf(
 
 	// debugging
 	int num_ints = counter;

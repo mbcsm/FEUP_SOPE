@@ -130,7 +130,7 @@ void *createThreadForTicketBooth(void *arg){
 		int fd;
 		char ansfifo_name[FIFO_LEN+1];
 		snprintf(ansfifo_name, sizeof ansfifo_name, "ans%d", request[requestToCheck].pid);
-    mkfifo(ansfifo_name, 0666);
+		mkfifo(ansfifo_name, 0666);
 
 		printf("%d-%d-%d: ", boothNumber, request[requestToCheck].pid,request[requestToCheck].numSeatsWanted);
 		snprintf(logText, sizeof logText, "%d-%d-%d: ", boothNumber, request[requestToCheck].pid,request[requestToCheck].numSeatsWanted);
@@ -144,7 +144,7 @@ void *createThreadForTicketBooth(void *arg){
 			if(request[requestToCheck].seatsWanted[i] > num_room_seats || request[requestToCheck].seatsWanted[i] < 0){
 				error = 2;
 				fd = open(ansfifo_name, O_WRONLY);
-				write(fd, "NST", sizeof("NST"));
+				write(fd, "-2", sizeof("-2"));
 				close(fd);
     		unlink(ansfifo_name);
 
@@ -160,7 +160,7 @@ void *createThreadForTicketBooth(void *arg){
 
 		if(request[requestToCheck].numSeatsWanted > MAX_CLI_SEATS && error == 0){
 				fd = open(ansfifo_name, O_WRONLY);
-				write(fd, "MAX", sizeof("MAX"));
+				write(fd, "-1", sizeof("-1"));
 				close(fd);
     		unlink(ansfifo_name);
 
@@ -176,7 +176,7 @@ void *createThreadForTicketBooth(void *arg){
 		if(num_room_seats - totalSeatsTaken < request[requestToCheck].numSeatsWanted && error == 0){
 
 				fd = open(ansfifo_name, O_WRONLY);
-				write(fd, "FUL", sizeof("FUL"));
+				write(fd, "-6", sizeof("-6"));
 				close(fd);
     		unlink(ansfifo_name);
 
@@ -213,7 +213,7 @@ void *createThreadForTicketBooth(void *arg){
 
 
 				fd = open(ansfifo_name, O_WRONLY);
-				write(fd, "NAV", sizeof("NAV"));
+				write(fd, "-5", sizeof("-5"));
 				close(fd);
     		unlink(ansfifo_name);
 
@@ -226,23 +226,28 @@ void *createThreadForTicketBooth(void *arg){
 				writeToSLOG(logText);
 				//Send Message To Client Saying the Seats are already taken
 			}
-		}
-		if(seatNotFree == 0 && error == 0){
+			
+			if(seatNotFree == 0 && error == 0){
 			printf(" - ");
 
 			char seatsReserved[10000];
+			int numSeatsReserved = 0;
 			for(int i = 0; i < request[requestToCheck].numSeatsWanted; i++ ){
 				printf("%d ", request[requestToCheck].seatsWanted[i]);
 				snprintf(seatsReserved, sizeof seatsReserved, "%d ", request[requestToCheck].seatsWanted[i]);
+				numSeatsReserved++;
 			}
 			fd = open(ansfifo_name, O_WRONLY);
-			perror("\n ansfifo open");
-			write(fd, request, sizeof(request));
+			char msg[1000];
+			sprintf(msg, "NumSeats: %d Seats: %s", numSeatsReserved, seatsReserved);
+			write(fd, msg, sizeof(msg));
 			close(fd);
 			unlink(ansfifo_name);
 			printf("\n");
 			writeToSLOG(logText);
 		}
+	}
+		
     return 0;
   }
 
